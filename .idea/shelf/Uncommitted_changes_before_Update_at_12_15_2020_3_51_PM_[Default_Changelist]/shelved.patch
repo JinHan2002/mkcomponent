@@ -1,0 +1,117 @@
+Index: README.md
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>#Demo\r\nhttp://donation-env.eba-xgqmeahm.us-east-2.elasticbeanstalk.com/vapps/donation/Form\r\n##Testing Account\r\nNote that the default John Doe account is running out of payment profile limitation. Please use the following account for testing.\r\n###username: jin.han\r\n###password: mkdecision2021@\r\n###testing card number: 4007000000027\r\n###Use an expiration date after today’s date and any three digits as cvv\r\n#Screen outline\r\nAfter user's login, the donation form page is loaded. Upon successful payment processing the user is presented with a confirmation page.\r\n###Moqui Login\r\n###Donation Form\r\n###Success Page\r\n\r\nScreens,Services, Entities and Setup Data are located at runtime/component/donation.\r\n\r\n\r\n\r\n\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/README.md b/README.md
+--- a/README.md	(revision 866c9376779fe15c39ec0b65580b07166ee18ee7)
++++ b/README.md	(date 1608068054080)
+@@ -1,16 +1,18 @@
+-#Demo
++# Demo
+ http://donation-env.eba-xgqmeahm.us-east-2.elasticbeanstalk.com/vapps/donation/Form
+-##Testing Account
++## Testing Account
+ Note that the default John Doe account is running out of payment profile limitation. Please use the following account for testing.
+-###username: jin.han
+-###password: mkdecision2021@
+-###testing card number: 4007000000027
+-###Use an expiration date after today’s date and any three digits as cvv
+-#Screen outline
++### username: jin.han
++### password: mkdecision2021@
++### testing card number: 4007000000027
++### Use an expiration date after today’s date and any three digits as cvv
++# Screen outline
+ After user's login, the donation form page is loaded. Upon successful payment processing the user is presented with a confirmation page.
+-###Moqui Login
+-###Donation Form
+-###Success Page
++### Moqui Login
++### Donation Form
++### Success Page
++# Developer Account 
++We use AuthorizeDotNet's Sandbox as our testing account.
+ 
+ Screens,Services, Entities and Setup Data are located at runtime/component/donation.
+ 
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"a48d1a79-f62b-4503-ba1b-cc9950969ba9\" name=\"Default Changelist\" comment=\"\">\r\n      <change afterPath=\"$PROJECT_DIR$/.idea/mkcomponent.iml\" afterDir=\"false\" />\r\n      <change afterPath=\"$PROJECT_DIR$/.idea/modules.xml\" afterDir=\"false\" />\r\n      <change afterPath=\"$PROJECT_DIR$/.idea/vcs.xml\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"ProjectId\" id=\"1li6MV5PgDpQPEKBzWszs2HPOCj\" />\r\n  <component name=\"ProjectLevelVcsManager\">\r\n    <ConfirmationsSetting value=\"2\" id=\"Add\" />\r\n  </component>\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\">\r\n    <property name=\"ASKED_ADD_EXTERNAL_FILES\" value=\"true\" />\r\n    <property name=\"RunOnceActivity.OpenProjectViewOnStart\" value=\"true\" />\r\n    <property name=\"RunOnceActivity.ShowReadmeOnStart\" value=\"true\" />\r\n    <property name=\"WebServerToolWindowFactoryState\" value=\"false\" />\r\n    <property name=\"last_opened_file_path\" value=\"$PROJECT_DIR$\" />\r\n    <property name=\"vue.rearranger.settings.migration\" value=\"true\" />\r\n  </component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"CopyFile.RECENT_KEYS\">\r\n      <recent name=\"C:\\Users\\hanji\\Desktop\\mkcomponent\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"SpellCheckerSettings\" RuntimeDictionaries=\"0\" Folders=\"0\" CustomDictionaries=\"0\" DefaultDictionary=\"application-level\" UseSingleDictionary=\"true\" transferred=\"true\" />\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"a48d1a79-f62b-4503-ba1b-cc9950969ba9\" name=\"Default Changelist\" comment=\"\" />\r\n      <created>1608067517214</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1608067517214</updated>\r\n      <workItem from=\"1608067518312\" duration=\"33000\" />\r\n    </task>\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n  </component>\r\n  <component name=\"VcsManagerConfiguration\">\r\n    <option name=\"ADD_EXTERNAL_FILES_SILENTLY\" value=\"true\" />\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision 866c9376779fe15c39ec0b65580b07166ee18ee7)
++++ b/.idea/workspace.xml	(date 1608069051420)
+@@ -1,10 +1,9 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project version="4">
+   <component name="ChangeListManager">
+-    <list default="true" id="a48d1a79-f62b-4503-ba1b-cc9950969ba9" name="Default Changelist" comment="">
+-      <change afterPath="$PROJECT_DIR$/.idea/mkcomponent.iml" afterDir="false" />
+-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
++    <list default="true" id="a48d1a79-f62b-4503-ba1b-cc9950969ba9" name="Default Changelist" comment="SUBMISSION">
++      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+     </list>
+     <option name="SHOW_DIALOG" value="false" />
+     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+@@ -32,6 +31,9 @@
+   </component>
+   <component name="RecentsManager">
+     <key name="CopyFile.RECENT_KEYS">
++      <recent name="C:\Users\hanji\Desktop\mkcomponent" />
++    </key>
++    <key name="MoveFile.RECENT_KEYS">
+       <recent name="C:\Users\hanji\Desktop\mkcomponent" />
+     </key>
+   </component>
+@@ -44,13 +46,42 @@
+       <option name="presentableId" value="Default" />
+       <updated>1608067517214</updated>
+       <workItem from="1608067518312" duration="33000" />
++      <workItem from="1608067626474" duration="1369000" />
+     </task>
++    <task id="LOCAL-00001" summary="SUBMISSION">
++      <created>1608067706813</created>
++      <option name="number" value="00001" />
++      <option name="presentableId" value="LOCAL-00001" />
++      <option name="project" value="LOCAL" />
++      <updated>1608067706813</updated>
++    </task>
++    <task id="LOCAL-00002" summary="SUBMISSION">
++      <created>1608067790385</created>
++      <option name="number" value="00002" />
++      <option name="presentableId" value="LOCAL-00002" />
++      <option name="project" value="LOCAL" />
++      <updated>1608067790385</updated>
++    </task>
++    <option name="localTasksCounter" value="3" />
+     <servers />
+   </component>
+   <component name="TypeScriptGeneratedFilesManager">
+     <option name="version" value="3" />
+   </component>
++  <component name="Vcs.Log.Tabs.Properties">
++    <option name="TAB_STATES">
++      <map>
++        <entry key="MAIN">
++          <value>
++            <State />
++          </value>
++        </entry>
++      </map>
++    </option>
++  </component>
+   <component name="VcsManagerConfiguration">
+     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
++    <MESSAGE value="SUBMISSION" />
++    <option name="LAST_COMMIT_MESSAGE" value="SUBMISSION" />
+   </component>
+ </project>
+\ No newline at end of file
