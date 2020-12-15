@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This software is in the public domain under CC0 1.0 Universal plus a 
+Grant of Patent License.
+
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software (see the LICENSE.md file). If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-2.1.xsd">
+
+    <!-- These services are based on the Authorize.Net CIM API, version 1. See: http://developer.authorize.net/api/cim/ -->
+
+    <service verb="get" noun="PaymentGatewayConfig">
+        <in-parameters>
+            <parameter name="paymentMethod" type="EntityValue"/>
+            <parameter name="paymentGatewayConfigId"/>
+        </in-parameters>
+        <out-parameters><parameter name="paymentGatewayConfigId"/></out-parameters>
+        <actions>
+            <!-- see if associated PaymentMethod has a paymentGatewayConfigId -->
+            <if condition="!paymentGatewayConfigId"><set field="paymentGatewayConfigId" from="paymentMethod?.paymentGatewayConfigId"/></if>
+            <!-- then try from PartySetting VaultPaymentGatewayConfigId if PaymentMethod.ownerPartyId is owned by an internal org (Party.ownerPartyId) -->
+            <if condition="!paymentGatewayConfigId &amp;&amp; paymentMethod?.ownerPartyId">
+                <set field="ownerParty" from="paymentMethod.ownerParty"/>
+                <if condition="ownerParty?.ownerPartyId">
+                    <service-call name="mantle.party.PartyServices.get#PartySettingValue" out-map="ptySettingOut"
+                            in-map="[partyId:ownerParty.ownerPartyId, partySettingTypeId:'VaultPaymentGatewayConfigId']"/>
+                    <set field="paymentGatewayConfigId" from="ptySettingOut?.settingValue"/>
+                </if>
+            </if>
+            <!-- then try from AuthorizeNetCimPaymentGatewayConfigId preference -->
+            <if condition="!paymentGatewayConfigId">
+                <set field="paymentGatewayConfigId" from="ec.user.getPreference('AuthorizeNetCimPaymentGatewayConfigId')"/></if>
+        </actions>
+    </service>
+
+    <service verb="store" noun="CustomerPaymentMethod" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="paymentMethodId" required="true"/>
+            <parameter name="validateSecurityCode"/>
+            <parameter name="paymentId"/>
+            <parameter name="paymentGatewayConfigId"><description>If not specified gets from PaymentMethod or AuthorizeNetCimPaymentGatewayConfigId user preference</description></parameter>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="mantle.account.method.CreditCard" value-field="creditCard"/>
+            <!-- for now we are only supporting CreditCard, though we could also support BankAccount with Authorize.Net CIM -->
+            <if condition="creditCard == null"><return/></if>
+            <entity-find-one entity-name="mantle.account.method.PaymentMethod" value-field="paymentMethod" for-update="true"/>
+
+            <service-call name="AuthorizeDotNet.CimServices.get#PaymentGatewayConfig" in-map="context" out-map="context"/>
+            <if condition="!paymentGatewayConfigId"><log level="warn" message="In store#CustomerPaymentMethod no paymentGatewayConfigId specified or AuthorizeNetCimPaymentGatewayConfigId user preference found"/><return/></if>
+            <entity-find-one entity-name="AuthorizeDotNet.PaymentGatewayAuthorizeNet" value-field="pgan"/>
+            <if condition="pgan == null">
+                <!-- this will happen regularly when PaymentMethod.paymentGatewayConfigId is for another gateway -->
+                <log message="Not saving payment method ${paymentMethodId} with Authorize.NET, no PaymentGatewayAuthorizeNet found with ID ${paymentGatewayConfigId}"/>
+                <return/>
+            </if>
+
+            <set field="party" from="paymentMethod.'Owner#mantle.party.Party'"/>
+
+            <!-- get billing contact info, use for any not set on PaymentMethod -->
+            <service-call name="mantle.party.ContactServices.get#PartyContactInfo" out-map="billingContactInfo"
+                    in-map="[partyId:paymentMethod.ownerPartyId, postalContactMechPurposeId:'PostalBilling',
+                            telecomContactMechPurposeId:'PhoneBilling', emailContactMechPurposeId:'EmailBilling']"/>
+
+            <set field="postalAddress" from="paymentMethod.postalAddress"/>
+            <if condition="postalAddress == null">
+                <set field="postalAddress" from="billingContactInfo.postalAddress"/>
+                <set field="stateProvinceGeo" from="billingContactInfo.postalAddressStateGeo"/>
+            </if>
+            <if condition="postalAddress == null"><return message="No address associated with credit card ${paymentMethodId}, not saving CIM record."/></if>
+            <set field="stateProvinceGeo" from="stateProvinceGeo != null ? stateProvinceGeo : postalAddress.stateProvinceGeo"/>
+
+            <set field="telecomNumber" from="paymentMethod.telecomNumber"/>
+            <if condition="telecomNumber == null"><set field="telecomNumber" from="billingContactInfo.telecomNumber"/></if>
+            <set field="phone" from="(telecomNumber?.countryCode ? (telecomNumber.countryCode + '-') : '') + (telecomNumber?.areaCode ? (telecomNumber.areaCode + '-') : '') + telecomNumber?.contactNumber"/>
+            <set field="emailContactMech" from="paymentMethod.'Email#mantle.party.contact.ContactMech'"/>
+            <if condition="emailContactMech == null"><set field="emailContactMech" from="billingContactInfo.emailContactMech"/></if>
+
+            <!-- credit card data -->
+            <set field="expireMonth" from="creditCard.expireDate ? creditCard.expireDate.substring(0, creditCard.expireDate.indexOf('/')) : null"/>
+            <set field="expireYear" from="creditCard.expireDate ? creditCard.expireDate.substring(creditCard.expireDate.indexOf('/')+1) : null"/>
+            <set field="expireDateFormatted" value="${expireYear}-${expireMonth}"/>
+            <!-- correct masking if needed, use only 'X' -->
+            <set field="cardNumber" from="creditCard.cardNumber?.replaceAll(/\D/, 'X')"/>
+            <if condition="paymentMethod.gatewayCimId"><then>
+                <!-- have a payment profile, call updateCustomerPaymentProfileRequest -->
+                <script><![CDATA[requestString = """<?xml version="1.0" encoding="utf-8"?>
+<updateCustomerPaymentProfileRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    <merchantAuthentication><name>${pgan.login}</name><transactionKey>${pgan.tranKey}</transactionKey></merchantAuthentication>
+    <customerProfileId>${party.gatewayCimId}</customerProfileId>
+    <paymentProfile>
+        <customerType>${party.partyTypeEnumId == 'PtyPerson' ? 'individual' : 'business'}</customerType>
+        <billTo>
+            <firstName>${encodeForXmlAttribute(paymentMethod.firstNameOnAccount)}</firstName><lastName>${encodeForXmlAttribute(paymentMethod.lastNameOnAccount)}</lastName>
+            <company>${encodeForXmlAttribute(paymentMethod.companyNameOnAccount)}</company>
+            <address>${encodeForXmlAttribute(postalAddress.address1)}</address><city>${encodeForXmlAttribute(postalAddress.city)}</city>
+            <state>${stateProvinceGeo?.geoCodeAlpha2 ?: stateProvinceGeo?.geoCodeAlpha3 ?: postalAddress.stateProvinceGeoId}</state><zip>${postalAddress.postalCode}${postalAddress.postalCodeExt ? '-' + postalAddress.postalCodeExt : ''}</zip>
+            <country>${postalAddress.countryGeoId}</country>
+            <phoneNumber>${phone ?: ''}</phoneNumber>
+        </billTo>
+        <payment><creditCard><cardNumber>${cardNumber}</cardNumber><expirationDate>${expireDateFormatted}</expirationDate>
+            ${validateSecurityCode || creditCard.cardSecurityCode ? ('<cardCode>' + (validateSecurityCode ?: creditCard.cardSecurityCode) + '</cardCode>') : ''}</creditCard></payment>
+        <customerPaymentProfileId>${paymentMethod.gatewayCimId}</customerPaymentProfileId>
+    </paymentProfile>
+    <validationMode>${pgan.validationMode}</validationMode>
+</updateCustomerPaymentProfileRequest>
+                """]]></script>
+            </then><else-if condition="party.gatewayCimId">
+                    <!-- no payment profile but we have a customer profile, call createCustomerPaymentProfileRequest -->
+                    <script><![CDATA[requestString = """<?xml version="1.0" encoding="utf-8"?>
+<createCustomerPaymentProfileRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    <merchantAuthentication><name>${pgan.login}</name><transactionKey>${pgan.tranKey}</transactionKey></merchantAuthentication>
+    <customerProfileId>${party.gatewayCimId}</customerProfileId>
+    <paymentProfile>
+        <customerType>${party.partyTypeEnumId == 'PtyPerson' ? 'individual' : 'business'}</customerType>
+        <billTo>
+            <firstName>${encodeForXmlAttribute(paymentMethod.firstNameOnAccount)}</firstName><lastName>${encodeForXmlAttribute(paymentMethod.lastNameOnAccount)}</lastName>
+            <company>${encodeForXmlAttribute(paymentMethod.companyNameOnAccount)}</company>
+            <address>${encodeForXmlAttribute(postalAddress.address1)}</address><city>${encodeForXmlAttribute(postalAddress.city)}</city>
+            <state>${stateProvinceGeo?.geoCodeAlpha2 ?: stateProvinceGeo?.geoCodeAlpha3 ?: postalAddress.stateProvinceGeoId}</state><zip>${postalAddress.postalCode}${postalAddress.postalCodeExt ? '-' + postalAddress.postalCodeExt : ''}</zip>
+            <country>${postalAddress.countryGeoId}</country>
+            <phoneNumber>${phone ?: ''}</phoneNumber>
+        </billTo>
+        <payment><creditCard><cardNumber>${cardNumber}</cardNumber><expirationDate>${expireDateFormatted}</expirationDate>
+            ${validateSecurityCode || creditCard.cardSecurityCode ? ('<cardCode>' + (validateSecurityCode ?: creditCard.cardSecurityCode) + '</cardCode>') : ''}</creditCard></payment>
+    </paymentProfile>
+    <validationMode>${pgan.validationMode}</validationMode>
+</createCustomerPaymentProfileRequest>
+                    """]]></script>
+            </else-if><else>
+                <!-- no customer or payment profile, call createCustomerProfileRequest -->
+                <script><![CDATA[requestString = """<?xml version="1.0" encoding="utf-8"?>
+<createCustomerProfileRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    <merchantAuthentication><name>${pgan.login}</name><transactionKey>${pgan.tranKey}</transactionKey></merchantAuthentication>
+    <profile>
+        <merchantCustomerId>${party.partyId}_${getRandomString(5)}</merchantCustomerId>
+        <email>${emailContactMech?.infoString ?: ''}</email>
+        <paymentProfiles>
+            <customerType>${party.partyTypeEnumId == 'PtyPerson' ? 'individual' : 'business'}</customerType>
+            <billTo>
+                <firstName>${encodeForXmlAttribute(paymentMethod.firstNameOnAccount)}</firstName><lastName>${encodeForXmlAttribute(paymentMethod.lastNameOnAccount)}</lastName>
+                <company>${encodeForXmlAttribute(paymentMethod.companyNameOnAccount)}</company>
+                <address>${encodeForXmlAttribute(postalAddress.address1)}</address><city>${encodeForXmlAttribute(postalAddress.city)}</city>
+                <state>${stateProvinceGeo?.geoCodeAlpha2 ?: stateProvinceGeo?.geoCodeAlpha3 ?: postalAddress.stateProvinceGeoId}</state><zip>${postalAddress.postalCode}${postalAddress.postalCodeExt ? '-' + postalAddress.postalCodeExt : ''}</zip>
+                <country>${postalAddress.countryGeoId}</country>
+                <phoneNumber>${phone ?: ''}</phoneNumber>
+            </billTo>
+            <payment><creditCard><cardNumber>${cardNumber}</cardNumber><expirationDate>${expireDateFormatted}</expirationDate>
+                ${validateSecurityCode || creditCard.cardSecurityCode ? ('<cardCode>' + (validateSecurityCode ?: creditCard.cardSecurityCode) + '</cardCode>') : ''}</creditCard></payment>
+        </paymentProfiles>
+     </profile>
+    <validationMode>${pgan.validationMode}</validationMode>
+</createCustomerProfileRequest>
+                """]]></script>
+            </else></if>
+
+            <!-- NOTE: ALWAYS REMOVE THIS BEFORE COMMIT! will contain sensitive information: -->
+            <!-- <log level="info" message="========== store#CustomerPaymentMethod requestString: \n${requestString}"/> -->
+            <set field="responseString" from="org.moqui.util.WebUtilities.simpleHttpStringRequest(pgan.transactionUrl, requestString, 'text/xml')"/>
+            <log message="store#CustomerPaymentMethod responseString: \n${responseString}"/>
+
+            <set field="responseNode" from="new XmlParser().parseText(responseString)"/>
+
+            <!-- save a PaymentGatewayResponse for the validation auth, if there is one -->
+            <if condition="responseNode.validationDirectResponseList?.string">
+                <iterate list="responseNode.validationDirectResponseList.string" entry="validationStringNode">
+                    <service-call name="AuthorizeDotNet.AimPaymentServices.save#AimResponse"
+                            in-map="[paymentMethodId:paymentMethodId, paymentOperationEnumId:'PgoStoreCim',
+                                paymentId:paymentId, paymentGatewayConfigId:paymentGatewayConfigId,
+                                responseString:validationStringNode.text(), delimeter:',']"/>
+                </iterate>
+            </if>
+
+            <if condition="responseNode.messages">
+                <set field="responseCode" from="responseNode.messages[0].resultCode[0]?.text()"/>
+                <if condition="responseNode.messages[0].message">
+                    <set field="message" from="responseNode.messages[0].message[0]"/>
+                    <set field="reasonCode" from="message.code[0]?.text()"/>
+                    <set field="reasonMessage" from="message.text[0]?.text()"/>
+                </if>
+            </if>
+            <if condition="!responseCode || !'Ok'.equalsIgnoreCase(responseCode)">
+                <log level="warn" message="Error saving Authorize.Net CIM info for PaymentMethod [${paymentMethodId}]: ${responseString}"/>
+                <if condition="reasonMessage != null &amp;&amp; reasonMessage.length() > 255"><set field="reasonMessage" from="reasonMessage.substring(0, 255)"/></if>
+                <service-call name="create#mantle.account.method.PaymentGatewayResponse" out-map="context"
+                        in-map="[paymentGatewayConfigId:paymentGatewayConfigId, paymentOperationEnumId:'PgoStoreCim',
+                            paymentMethodId:paymentMethodId, paymentId:paymentId, transactionDate:ec.user.nowTimestamp,
+                            responseCode:responseCode, reasonCode:reasonCode, reasonMessage:reasonMessage, resultSuccess:'N', resultError:'Y']"/>
+                <return type="danger" message="Could not save CIM payment method ${paymentMethodId}, message: ${reasonMessage}"/>
+            </if>
+
+            <service-call name="create#mantle.account.method.PaymentGatewayResponse" out-map="context"
+                    in-map="[paymentGatewayConfigId:paymentGatewayConfigId, paymentOperationEnumId:'PgoStoreCim',
+                            paymentMethodId:paymentMethodId, transactionDate:ec.user.nowTimestamp,
+                            responseCode:responseCode, reasonCode:reasonCode, reasonMessage:reasonMessage, resultSuccess:'Y', resultError:'N']"/>
+
+            <!-- set the gatewayCimId values for Party and PaymentMethod as needed -->
+            <if condition="paymentMethod.gatewayCimId"><then>
+                <!-- have a payment profile, called updateCustomerPaymentProfileRequest, no need to do anything -->
+            </then><else-if condition="party.gatewayCimId">
+                <!-- no payment profile but we have a customer profile, called createCustomerPaymentProfileRequest -->
+                <set field="paymentMethod.gatewayCimId" from="responseNode.customerPaymentProfileId.text()"/>
+                <set field="paymentMethod.paymentGatewayConfigId" from="paymentGatewayConfigId"/>
+                <entity-update value-field="paymentMethod"/>
+            </else-if><else>
+                <!-- no customer or payment profile, called createCustomerProfileRequest -->
+                <set field="party.gatewayCimId" from="responseNode.customerProfileId.text()"/>
+                <entity-update value-field="party"/>
+                <set field="paymentMethod.gatewayCimId" from="responseNode.customerPaymentProfileIdList.numericString.text()"/>
+                <set field="paymentMethod.paymentGatewayConfigId" from="paymentGatewayConfigId"/>
+                <entity-update value-field="paymentMethod"/>
+            </else></if>
+
+            <!-- clear out creditCard.cardNumber and creditCard.cardSecurityCode -->
+            <set field="creditCard.cardSecurityCode" from="null"/>
+            <set field="creditCard.cardNumber"
+                    from="'*'.padRight(creditCard.cardNumber.length() - 4, '*') + creditCard.cardNumber.substring(creditCard.cardNumber.length() - 4, creditCard.cardNumber.length())"/>
+            <entity-update value-field="creditCard"/>
+        </actions>
+    </service>
+
+    <service verb="delete" noun="CustomerPaymentMethod">
+        <in-parameters><parameter name="paymentMethodId"/></in-parameters>
+        <actions>
+            <entity-find-one entity-name="mantle.account.method.PaymentMethod" value-field="paymentMethod" for-update="true"/>
+
+            <service-call name="AuthorizeDotNet.CimServices.get#PaymentGatewayConfig" in-map="context" out-map="context"/>
+            <if condition="!paymentGatewayConfigId"><log level="warn" message="In delete#CustomerPaymentMethod no paymentGatewayConfigId specified or AuthorizeNetCimPaymentGatewayConfigId user preference found"/><return/></if>
+            <entity-find-one entity-name="AuthorizeDotNet.PaymentGatewayAuthorizeNet" value-field="pgan"/>
+            <if condition="pgan == null">
+                <!-- this will happen regularly when PaymentMethod.paymentGatewayConfigId is for another gateway -->
+                <log message="Not deleting payment method ${paymentMethodId} from Authorize.NET, no PaymentGatewayAuthorizeNet found with ID ${paymentGatewayConfigId}"/>
+                <return/>
+            </if>
+
+            <set field="party" from="paymentMethod.'Owner#mantle.party.Party'"/>
+
+            <if condition="paymentMethod.gatewayCimId">
+                <!-- call deleteCustomerPaymentProfileRequest -->
+                <script><![CDATA[requestString = """<?xml version="1.0" encoding="utf-8"?>
+<deleteCustomerPaymentProfileRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    <merchantAuthentication><name>${pgan.login}</name><transactionKey>${pgan.tranKey}</transactionKey></merchantAuthentication>
+    <customerProfileId>${party.gatewayCimId}</customerProfileId>
+    <customerPaymentProfileId>${paymentMethod.gatewayCimId}</customerPaymentProfileId>
+</deleteCustomerPaymentProfileRequest>
+                """]]></script>
+
+                <set field="responseString" from="org.moqui.util.WebUtilities.simpleHttpStringRequest(pgan.transactionUrl, requestString, 'text/xml')"/>
+                <log level="info" message="delete#CustomerPaymentMethod responseString: \n${responseString}"/>
+                <set field="responseNode" from="new XmlParser().parseText(responseString)"/>
+
+                <if condition="responseNode.messages">
+                    <set field="responseCode" from="responseNode.messages[0].resultCode[0]?.text()"/>
+                    <if condition="responseNode.messages[0].message">
+                        <set field="message" from="responseNode.messages[0].message[0]"/>
+                        <set field="reasonCode" from="message.code[0]?.text()"/>
+                        <set field="reasonMessage" from="message.text[0]?.text()"/>
+                    </if>
+                </if>
+                <if condition="!responseCode || !'Ok'.equalsIgnoreCase(responseCode)">
+                    <log level="warn" message="Error deleting Authorize.Net CIM info for PaymentMethod [${paymentMethodId}]: ${responseString}"/>
+                    <if condition="reasonMessage != null &amp;&amp; reasonMessage.length() > 255"><set field="reasonMessage" from="reasonMessage.substring(0, 255)"/></if>
+                    <service-call name="create#mantle.account.method.PaymentGatewayResponse" out-map="context"
+                            in-map="[paymentGatewayConfigId:paymentGatewayConfigId, paymentOperationEnumId:'PgoStoreCim',
+                            paymentMethodId:paymentMethodId, transactionDate:ec.user.nowTimestamp,
+                            responseCode:responseCode, reasonCode:reasonCode, reasonMessage:reasonMessage, resultSuccess:'N', resultError:'Y']"/>
+                    <return message="Could not delete CIM payment method ${paymentMethodId}, message: ${reasonMessage}"/>
+                </if>
+
+                <service-call name="create#mantle.account.method.PaymentGatewayResponse" out-map="context"
+                        in-map="[paymentGatewayConfigId:paymentGatewayConfigId, paymentOperationEnumId:'PgoStoreCim',
+                            paymentMethodId:paymentMethodId, transactionDate:ec.user.nowTimestamp,
+                            responseCode:responseCode, reasonCode:reasonCode, reasonMessage:reasonMessage, resultSuccess:'Y', resultError:'N']"/>
+
+                <set field="paymentMethod.gatewayCimId" from="null"/>
+                <entity-update value-field="paymentMethod"/>
+            </if>
+        </actions>
+    </service>
+</services>

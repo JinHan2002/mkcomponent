@@ -1,0 +1,73 @@
+
+Mantle Authorize.NET Integration Release Notes
+
+===========================================================================
+Release 1.2.3 - 07 Dec 2019
+===========================================================================
+
+Mantle Authorize.NET Integration 1.2.3 is a patch level update release.
+
+There are only minor changes and fixes in this release. For a complete
+list of changes see:
+
+https://github.com/moqui/AuthorizeDotNet/compare/v1.2.2...v1.2.3
+
+===========================================================================
+Release 1.2.2 - 23 July 2019
+===========================================================================
+
+Mantle Authorize.NET Integration 1.2.2 is a patch level update release.
+
+There are only minor changes and fixes in this release. For a complete
+list of changes see:
+
+https://github.com/moqui/AuthorizeDotNet/compare/v1.2.1...v1.2.2
+
+===========================================================================
+Release 1.2.1 - 29 Nov 2018
+===========================================================================
+
+Mantle Authorize.NET Integration 1.2.1 is a patch level update release.
+
+This release is based on Moqui Framework 2.1.1, mantle-udm 2.1.0,
+and mantle-usl 2.1.0.
+
+This version has some improved error handling, polling for transaction
+status, and updates for the latest in Moqui and Mantle.
+
+===========================================================================
+Release 1.2.0 - 22 Oct 2017
+===========================================================================
+
+Mantle Authorize.NET Integration 1.2.0 is a minor update release.
+
+This release is based on Moqui Framework 2.1.0, mantle-udm 2.0.0,
+and mantle-usl 2.0.0.
+
+This version has significant error handling improvements based on
+production hardening for the CIM services and is updated for changes in
+Moqui Framework and Mantle.
+
+===========================================================================
+Release 1.1.0 - 24 Nov 2016
+===========================================================================
+
+Mantle Authorize.NET Integration 1.1.0 is a minor update release.
+
+This release is based on Moqui Framework 2.0.0, mantle-udm 1.1.0,
+and mantle-usl 1.1.0.
+
+This version is updated for changes in Moqui Framework and Mantle.
+
+===========================================================================
+Release 1.0.0 - 24 Jan 2016
+===========================================================================
+
+Mantle Authorize.NET Integration 1.0.0 is the first release as a component
+repository separate from the other components in Mantle Business Artifacts.
+
+This release is based on Moqui Framework 1.6.1, mantle-udm 1.0.0,
+and mantle-usl 1.0.0.
+
+The initial code is from Mantle 1.2.0 and has only minor changes but has
+updates for the new Moqui Framework component management features.
